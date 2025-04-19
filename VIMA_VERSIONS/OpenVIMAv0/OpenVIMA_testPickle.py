@@ -225,12 +225,12 @@ class RobotControlGUI:
         self.ik_sliders, self.ik_labels = self.slider_constructor(self.ik_frame, ik_limits, ik_slider_names, 115)
 
         # add logo
-        self.logo_label = customtkinter.CTkLabel(self.ik_frame, text=None, fg_color=self.themeColor, corner_radius=8,
-                                                 height=150)
-        self.logo_label.place(x=30, y=770)
-        logo_img = cv2.imread(logo1)
-        logo_img = cv2.resize(logo_img, (int(logo_img.shape[0] / 8), int(logo_img.shape[1] / 8)))
-        self.process_image(logo_img, self.logo_label, logo_img.shape)
+        # self.logo_label = customtkinter.CTkLabel(self.ik_frame, text=None, fg_color=self.themeColor, corner_radius=8,
+        #                                          height=150)
+        # self.logo_label.place(x=30, y=770)
+        # logo_img = cv2.imread(logo1)
+        # logo_img = cv2.resize(logo_img, (int(logo_img.shape[0] / 8), int(logo_img.shape[1] / 8)))
+        # self.process_image(logo_img, self.logo_label, logo_img.shape)
 
         # ============================================================ CONTROL ACTIVATION SWITCHES
 
@@ -673,7 +673,7 @@ COMS = ["COM3", "COM8"]
 init_angles = [0, -17, 109, 0, 0, 0]
 init_coords = [200,0,200,0,0,0]
 
-folder_path = r'DATA_FROM_TRAINER'
+folder_path = r'./VIMA_VERSIONS/OpenVIMAv0/DATA_FROM_TRAINER'
 
 try:
     # root, joint_limits, demo_mode_bool, serialARGS
