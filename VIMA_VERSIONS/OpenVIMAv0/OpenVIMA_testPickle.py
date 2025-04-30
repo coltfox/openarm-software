@@ -63,6 +63,8 @@ import math
 import pickle
 import TRAINER_MODULE as trainer
 
+import multiprocessing
+
 
 # Assuming the serial module works as intended
 
@@ -341,7 +343,6 @@ class RobotControlGUI:
             print(SE, "keep running for now, but no arudino connected")
             self.demo = True
             return None  #
-
     # Used to define a attribute list of serial comms
 
     def device_contstructor(self):
@@ -356,7 +357,6 @@ class RobotControlGUI:
             device_label_list.append(device_label)
 
         return device_label_list
-
     # Used to define a attribute list of device labels
 
     def slider_constructor(self, frame, slider_limits, slider_names, SPACING):

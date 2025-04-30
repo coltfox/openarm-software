@@ -142,6 +142,7 @@ class ComputerVision:
 
         else:
             print("No human")
+            time.sleep(1)
             return [],[],[], ogimg
     # returns a list of points for which cx, cy, and cZ for body landmarks
 

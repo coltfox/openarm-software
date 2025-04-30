@@ -357,7 +357,7 @@ ik_limits = [[-200, 200], [-200, 200], [-200, 200], [-6, 6], [-6, 6], [-6, 6]]
 
 
 
-
+from matplotlib.pyplot import Figure
 
 # make numpy raise errors instead of warn so can be caught by try except blocks
 np.seterr(all="raise")
@@ -383,7 +383,6 @@ class ForwardKinematics:
                             wspace=0.706,
                             hspace=0.5)
         #DEV
-        #self.fig = Figure(figsize=(20,16))
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.limits = limits
 
@@ -618,7 +617,7 @@ class ForwardKinematics:
 
         # plot data
         self.ax.plot(xplots, yplots, zplots, c=hover)
-        self.ax.scatter(xplots, yplots, zplots, c="#00ffff")
+        #self.ax.scatter(xplots, yplots, zplots, c="#00ffff")
         self.plotOrigin(xplots[0], yplots[0], zplots[0], 0, 0, 0, 50)
         self.plotOrigin(xplots[6], yplots[6], zplots[6], rx, ry, rz, 50)
         #self.fig.canvas.draw()
@@ -626,7 +625,6 @@ class ForwardKinematics:
 
 
         # show plotted data
-        plt.draw()
         plt.pause(0.5)
 
     def main2(self, angles):
@@ -663,7 +661,7 @@ class ForwardKinematics:
             line.set_linewidth(30)
 
 
-        self.ax.scatter(xplots, yplots, zplots, c="#00ffff", marker='o')
+        #self.ax.scatter(xplots, yplots, zplots, c="#00ffff", marker='o')
         self.plotOrigin(xplots[0], yplots[0], zplots[0], 0, 0, 0, 50)
         self.plotOrigin(xplots[6], yplots[6], zplots[6], rx, ry, rz, 50)
 

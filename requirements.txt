@@ -1,0 +1,10 @@
+customtkinter==5.2.0
+cvzone==1.6.1
+keyboard==0.13.5
+matplotlib==3.8.3
+mediapipe==0.10.8
+numpy==1.24.3
+opencv_contrib_python==4.8.1.78
+opencv_python==4.8.1.78
+Pillow==11.1.0
+pyserial==3.5

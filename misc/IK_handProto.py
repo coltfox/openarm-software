@@ -1,4 +1,4 @@
-from DynamicsSolver import StatsModule
+from DynamicsSolvers import StatsModule
 from OpenVIMAv1dot0 import InverseKinematicsModule as Kinematics_module
 from OpenVIMAv1dot0 import ComputerVisonModulev1 as Vision_module
 

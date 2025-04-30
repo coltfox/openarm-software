@@ -100,7 +100,11 @@ class Person:
         self.orient_path_coords = [[],[],[]]
 
         #plots
-        self.fig, self.ax = plt.subplots(subplot_kw=dict(projection='3d'))
+        if not self.do_kinematics:
+            self.fig, self.ax = plt.subplots(subplot_kw=dict(projection='3d'))
+
+        else:
+            self.fig, self.ax = self.FK.fig, self.FK.ax
         self.prior_dest = [0,0,0,0,0,0]
         self.prior_error = [self.prior_dest]
         self.product_mode = False
@@ -309,7 +313,7 @@ class Person:
 
 def test1():
 
-    Pacheck = Person()
+    Pacheck = Person(True)
 
 
 

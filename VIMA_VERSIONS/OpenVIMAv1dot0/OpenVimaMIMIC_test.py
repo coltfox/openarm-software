@@ -33,9 +33,7 @@ if __name__ == "__main__":
     #init computer vision
     simon = eye.MimicController()
     simon.Vision.USE_MULTITHREADING = True
-    #init serial
-    ardu = SerialModule.Arduino("COM3", 115200)
-    ardu.dual_handshake()
+
 
 
 
@@ -44,9 +42,9 @@ if __name__ == "__main__":
     while True:
 
 
-        # CV
+        # CV returns forward and inverse kinematics
         img, fk, ik = simon.top_main()
-        print("FK: ", fk)
+        print("FK: ", fk, "IK", ik)
 
         # Show the image
         cv2.imshow("CV", img)
@@ -55,5 +53,3 @@ if __name__ == "__main__":
 
 
 
-        # Send to Ardu
-        ardu.inLoopSerialSender(fk + [0], True)

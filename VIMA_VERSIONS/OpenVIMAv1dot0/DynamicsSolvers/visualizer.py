@@ -3,8 +3,7 @@
 
 
 import StatsModule
-import InverseKinematicsModule as Kinematics_module
-import ComputerVisonModulev1 as Vision_module
+from OpenArmV1 import InverseKinematicsModule as Kinematics_module, ComputerVisonModulev1 as Vision_module
 from DynamicsSolver import MultivariableCalculus as MultiVarCalc_module
 
 import cv2
