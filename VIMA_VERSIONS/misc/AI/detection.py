@@ -13,7 +13,7 @@ while True:
         break
 
     # Perform inference
-    results = model(frame)
+    results = model(frame, verbose=False)
 
     # Render results on the frame
     frame = results[0].plot()
@@ -26,7 +26,7 @@ while True:
 
         # Annotate frame with top 3 predictions
         for cls, conf in top_predictions:
-            label = f"{model.names[int(cls)]}: {conf:.2f}"
+            label = f"{model.names[int(cls)]}"
             print(label)
 
     # Display the frame

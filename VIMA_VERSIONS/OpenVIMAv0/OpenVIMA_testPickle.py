@@ -636,7 +636,6 @@ class RobotControlGUI:
         label.configure(image=photo)
         label.image = photo
 
-        # self.master.after(10, self.display_loop)
 
     # Called in main_loop to update and maintain
 

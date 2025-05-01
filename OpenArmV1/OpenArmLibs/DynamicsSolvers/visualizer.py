@@ -2,8 +2,9 @@
 
 
 
-from DynamicsSolver import StatsModule
-from OpenArmV1 import InverseKinematicsModule as Kinematics_module, ComputerVisonModulev1 as Vision_module
+import StatsModule
+from OpenArmV1 import ComputerVisonModulev1 as Vision_module
+from OpenArmV1.OpenArmLibs import InverseKinematicsModule as Kinematics_module
 from DynamicsSolver import MultivariableCalculus as MultiVarCalc_module
 
 import cv2
@@ -150,7 +151,6 @@ class Person:
         def prep_stem_plot_sub(value, coord_set, path_length):
             #Make a meaned average value
             coord_set = coord_set + [value]
-            mean_value = mean
             #But append the standard value that is passed into the function
             coord_set.append(np.mean([value] + coord_set))
             if len(coord_set)>= path_length:

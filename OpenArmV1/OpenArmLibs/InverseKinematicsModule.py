@@ -368,7 +368,6 @@ plt.ion()
 class ForwardKinematics:
 
     def __init__(self, limits):
-        #self.vision = pacheckCV.ComputerVisionBody(False)
 
 
         # Create a new figure and add a 3D subplot

@@ -1,42 +1,6 @@
-
-'''
-=============================================================
-
-/ Engineer:   Pacheck Nicholas
-// Date Created: 11/16/23
-
-// Module Description:
-
-    This module handles all the image processing and landmark estimation required for OpenVIMA's
-    MIMIC Controller. Applicable/used in both Forward Kinematics and Inverse Kinematics Version.
-    While the mediapipe library provides landmark solutions for body, and landmark solutions for hands
-    the goal of this module is to combine those solutions together.
-
-    Forward Kinematics:
-        Provides set of angles determined by joint angles of user.
-
-    Inverse Kinematics:
-        Provides (x,y,z) coordinate describing the end effector ( finger ) position
-
-    Challenges:
-        Z-coordinate estimation in addtion to localization have been challenging
-
-
-
-
-// TODO:
-
-1. Add baud rate, zfill, and port communications to insure compatibility across devices
-2. embed the self.conenciton into the status bits
-
-
-
-// Modifications:
-    Date:    Engineer:     Modification Description
-
-=============================================================
-'''
-
+import InverseKinematicsModule as Kinematics_module
+import ComputerVisonModulev1 as Vision_module
+from OpenArmV1.OpenArmLibs.DynamicsSolvers import MultivariableCalculus as MultiVarCalc_module, StatsModule
 
 import queue
 
@@ -45,24 +9,17 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import mediapipe as mp
-import pickle as pkl
 import math
 import threading
 
 
-#SAME AS ARDUINO MAP() FUNCTION
+# SAME AS ARDUINO MAP() FUNCTION
 def changeBasis(value, fromLow, fromHigh, toLow, toHigh):
-    try:return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow
+    try:
+        return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow
     except ZeroDivisionError as ZERO:
         print(ZERO)
         return 0
-
-
-    #TODO, GPU ACCELERATION
-
-
-
-
 
 class ComputerVision:
     '''This class is to be used as module for image processing and computer vision landmark detection.
@@ -71,7 +28,7 @@ class ComputerVision:
 
     call image processing as main'''
 
-    def __init__(self, threaded = False, cap = cv2.VideoCapture(0)):
+    def __init__(self, threaded = False,proc=False, cap = cv2.VideoCapture(0)):
 
         #An attribute that contains a path to methods for drawing on image
         self.mpDraw = mp.solutions.drawing_utils
@@ -93,6 +50,7 @@ class ComputerVision:
         self.verbose = False
 
         self.USE_MULTITHREADING = threaded
+        self.USE_MULTIPROCESSING = proc
         if self.USE_MULTITHREADING:
             #Used for threaded image processing to return asnwers from each thread
             self.thread_answers = queue.Queue()
@@ -176,11 +134,11 @@ class ComputerVision:
 
         if self.USE_MULTITHREADING:
             img, body_coords, hand_coords = self.threaded_imageProcessing()
+        elif self.USE_MULTIPROCESSING:
+            pass
         else: # dont use multithreading
             img, body_coords, hand_coords = self.unthreaded_imageProcessing()
         return img, body_coords, hand_coords
-
-
 
 
 
@@ -239,14 +197,15 @@ class ComputerVision:
 
 class DepthLocalizer:
 
-    def __init__(self):
-        #inicnial conditions for the running statisics
+    def __init__(self, dataset = []):
+
         self.max_area = -1000000000000
         self.min_area = 10000000000000
 
         #The area read when the user is at their origin
         self.area_origin = 0
-    #constructor
+
+        self.dataset = dataset
 
     def generate_zCoords(self, coords):
 
@@ -256,102 +215,240 @@ class DepthLocalizer:
         z_offset = 100/(np.sqrt(area))
 
         return z_offset
-    #returns a z coordinate offset related to the distance away from the camera
+
 
     def compute_bodyArea(self, coords):
 
         #Unpack coordinates
+        cx, cy, cz = coords[0], coords[1], coords[2]
         try:
-            cx, cy, cz = coords
-        except ValueError:
-            cx, cy, cz = coords[0], coords[1], coords[2]
-        #Compute boundary conditions
-        max_cx, max_cy, max_cz = max(cx), max(cy), max(cz)
-        min_cx, min_cy, min_cz = min(cx), min(cy), min(cz)
-        #Compute area of boundary conditions
-        bbox_len, bbox_heigh = (max_cx - min_cx), (max_cy - min_cy)
-        bbox = bbox_len*bbox_heigh
-        #update extrema
-        if bbox > self.max_area: self.max_area = bbox
-        if bbox < self.min_area: self.min_area = bbox
+            #Compute boundary conditions
+            max_cx, max_cy, max_cz = max(cx), max(cy), max(cz)
+            min_cx, min_cy, min_cz = min(cx), min(cy), min(cz)
+            #Compute area of boundary conditions
+            bbox_len, bbox_heigh = (max_cx - min_cx), (max_cy - min_cy)
+            bbox = bbox_len*bbox_heigh
+        except ValueError as VE:
+            return 0
 
         return bbox
-    #return the area in pixels the the max and min on the body do
+
+
+
 
     def set_zeroOrigin(self, bbox_area):
         self.area_origin = bbox_area
-    #sets the zere axis inicialiation poitnt
+
+#DEEFINE HAND LANDAMRKS
+WRIST = 0
+INDEX = 8
+INDEX_BOTTOM = 5
+class Person:
+
+
+    def __init__(self, do_kin=True):
 
 
 
+        #boundary limits for urdf robot
+        self.ik_limits = [[-200, 200], [-200, 200], [-200, 200], [-6, 6], [-6, 6], [-6, 6]]
+
+        # bool
+        self.do_kinematics = do_kin
+        # Init kinematics module only if in test and trying to show graphics
+        if self.do_kinematics:
+            self.IK = Kinematics_module.InverseKinematics(self.ik_limits)
+            self.FK = Kinematics_module.ForwardKinematics(self.ik_limits[0])
+
+
+        # inicialize the computer vision module
+        self.eye = Vision_module.ComputerVision(threaded=True)
+
+        # maps user vector space to robot vector space
+        self.PathFusor = StatsModule.MultiCoordinateFusion(self.ik_limits)
+        # used for some basic calculations
+        self.mCalc = MultiVarCalc_module.MultiVar_Calc()
+        # used to give an additonal z depth based on hand/body area
+        self.depthLocalizer = DepthLocalizer()
 
 
 
-
-
-#main
-class MimicController:
-
-    '''This class should work in harmony withe multivariable calculaus solver, the depth localizer, ]
-    and the computer vision modle to provdie smooth and reliable coordiantes to the serial bus.
-
-    The base fk angle will be derived by approxinamating the z- location of the users hips which
-    coorespond to the coordinates 23 and 24.
-    The shoulder and elbow angles are dervifed from the dotproduct of the two vecotrs in 3 dimentiosn to find angle
-    DiffA and DiffB wiill be derived from the inverse kinematics sections to select the orientation of the robto'''
-
-
-    def __init__(self):
-
-
-        #Boolean that defines if the program is for 5 or 6 dof robot
-        self.SIX_DOF_MODE = False
-        self.verbose = False
-
-        #list which holds the cv landmark indexes between limbs
-        #Indexed shoulder, elbow,
-        self.fk_joints = [[23, 11, 13], [11, 13, 21]] #BASE NOT INCLUDED
-
-        #Updates each loop so that we dont have to pass the coords into every funciton but instead just reference the attribute
-        self.cx_list, self.cy_list, self.cz_list = [], [], []
-        self.hand_coords = []
+        self.img = None
+        #person coords
         self.body_coords = []
+        self.cx_list, self.cy_list, self.cz_list = [[0], [0], [0]]
+        self.hand_coords = []
 
-        #boolean element lis that tells if two landmarks are touching or not
-        self.click_flag = []
+        #last path coords
+        self.path_coords = [[0],[0],[0]]
+        #orientations (pitch roll yaw)
+        self.orient_path_coords = [[],[],[]]
 
+        #plots
+        if not self.do_kinematics:
+            self.fig, self.ax = plt.subplots(subplot_kw=dict(projection='3d'))
 
-        #Init computer vision module
-        self.Vision = ComputerVision(threaded=True)
+        else:
+            self.fig, self.ax = self.FK.fig, self.FK.ax
+        self.prior_dest = [0,0,0,0,0,0] #update before real tst
 
-        #todo Init multivariable calculus module
-
-        #Init depth localizer
-        self.Depth_Sovler = DepthLocalizer()
-
-
-    def top_main(self):
-
-
-        #call computer vision process
-        img, body_coords, hand_coords = self.Vision.imageProcessing()
-
-        #make attribute updates
-        self.update_coordinates(body_coords, hand_coords)
-
-        #Forward kinematics
-        thetaListFK = self.compute_fkLimbAngles()
-
-        #inverse kinematics
-        thetaListIK = self.compute_ikHandControlLimbAngles()
-
-        thetaListFK = [ int(angle) for angle in thetaListFK]
+        # used for pid
+        self.prior_coord = self.prior_dest
+        self.prior_error = [self.prior_dest]
+        self.product_mode = False
 
 
-        if self.verbose: print(thetaListFK, thetaListIK.shape)
-        return img, thetaListFK, thetaListIK
+    # inverse kinematics
+    def get_destination(self):
+        #Get Coords
+        self.img, self.body_coords, self.hand_coords = self.eye.imageProcessing()
 
-    #main1
+        # Create vector for hand
+        hand_vec = [self.hand_coords[WRIST][INDEX].x - self.hand_coords[WRIST][INDEX_BOTTOM].x,
+                    self.hand_coords[WRIST][INDEX].y - self.hand_coords[WRIST][INDEX_BOTTOM].y,
+                    self.hand_coords[WRIST][INDEX].z - self.hand_coords[WRIST][INDEX_BOTTOM].z]
+        #compute orientation
+        orients = self.vector_to_roll_pitch_yaw(hand_vec)
+        #u,v,w = self.get_uvw([roll, pitch, yaw])
+        #TODO: INIT ANOTHER FUSOR MODULE AND FUSE COORDS TO ROBOT URDF
+        # coords = [
+        #
+        #     0.5 * (self.hand_coords[0][8].x + self.body_coords[0][19]),
+        #     0.5 * (self.hand_coords[0][8].y + self.body_coords[1][19]),
+        #     0.5 * (self.hand_coords[0][8].z + self.body_coords[2][19])
+        #
+        # ]
+        # define origin
+        coords = [self.hand_coords[0][5].x,
+                  self.hand_coords[0][5].y,
+                  self.hand_coords[0][5].z ]
+
+
+        destination = np.array([
+            coords,#xyz
+            hand_vec# oretnation vector
+
+        ]).flatten()
+        return destination
+
+    def vector_to_roll_pitch_yaw(self,vector):
+        x, y, z = vector
+        roll = math.atan2(y, x)
+        pitch = math.atan2(-z, math.sqrt(x ** 2 + y ** 2))
+        yaw = math.atan2(math.sin(roll) * z - math.cos(roll) * y,
+                         math.cos(roll) * x + math.sin(roll) * math.sin(pitch) * y + math.sin(roll) * math.cos(
+                             pitch) * z)
+        return (np.rad2deg(roll),
+                np.rad2deg(pitch),
+                np.rad2deg(yaw))
+
+    def get_uvw(self,euler):
+        roll, pitch, yaw = euler
+        # Convert roll, pitch, and yaw angles to radians
+        r = np.deg2rad(roll)
+        p = np.deg2rad(pitch)
+        y = np.deg2rad(yaw)
+
+        # Define the unit vector in the local coordinate system
+        u = np.array([1, 1, 1])
+
+        # Define the rotation matrix
+        R_x = np.array([[1, 0, 0],
+                        [0, np.cos(r), -np.sin(r)],
+                        [0, np.sin(r), np.cos(r)]])
+        R_y = np.array([[np.cos(p), 0, np.sin(p)],
+                        [0, 1, 0],
+                        [-np.sin(p), 0, np.cos(p)]])
+        R_z = np.array([[np.cos(y), -np.sin(y), 0],
+                        [np.sin(y), np.cos(y), 0],
+                        [0, 0, 1]])
+        R = R_z @ R_y @ R_x
+
+        # Rotate the unit vector to the global coordinate system
+        u_global = R @ u
+        return 10*u_global
+
+    def plot_hand_path(self, destination, path_length):
+        coords, orients = destination[0:3], destination[3:]
+
+
+        #clear plots
+        self.ax.clear()
+
+
+        #get list of path coordinates plotted
+        self.path_coords = self.prep_stem_plot(coords, self.path_coords, path_length)
+        xList, yList, zList = self.path_coords
+
+        self.orient_path_coords = self.prep_stem_plot(orients, self.orient_path_coords, path_length)
+        orient_xList, orient_yList, orient_zList = self.orient_path_coords
+
+
+        # get running stats
+        limits = self.PathFusor.to_limits#get_from_limits()
+        # update plot limits according to the path already drawn
+        self.ax.set_xlim(*limits[0])
+        self.ax.set_ylim(*limits[1])
+        self.ax.set_zlim(*limits[2])
+
+
+
+        #plot
+        #self.ax.stem(xList, yList, zList)
+        self.ax.quiver(xList, yList, zList, orient_xList, orient_yList, orient_zList,
+                       length=10,
+                       pivot = 'tail',
+                       normalize = False
+                       )
+        plt.draw()
+        plt.pause(0.01)
+
+    def prep_stem_plot(self, new_coords, myList, path_length):
+        def prep_stem_plot_sub(value, coord_set, path_length):
+            #Make a meaned average value
+            coord_set = coord_set + [value]
+            #But append the standard value that is passed into the function
+            #coord_set.append(np.mean([value] + coord_set))
+            if len(coord_set)>= path_length:
+                coord_set.pop(0)
+
+            return coord_set
+
+        path_coords = [prep_stem_plot_sub(new_coords[i], coord_set, path_length)
+                       for i,coord_set in enumerate(myList)]
+        return path_coords
+        #function returns a list of 10 newest values
+
+    def average_coords(self, destination):
+        mean = [(now+prior)/2 for now, prior in zip(destination, self.prior_dest)]
+        self.prior_dest = destination
+        return mean
+    def compute_ikHandControlLimbAngles(self):
+
+        #Compute the (x,y,z) and <vx, vy,vz> of the oreintation of finger
+        destination = self.get_destination()
+
+        # compute the moving average
+        destination = self.average_coords(destination)
+
+
+        #fuse coordinates, return value is unimportant, used for plot limits
+        fused = self.PathFusor.fuse_coordinates(destination, scalar=2)
+        destination = fused
+
+        destination = [destination[2], destination[0], -destination[1],
+                       destination[3], destination[4],destination[5]]
+
+        #COmpute the forward kinemtaics acutator angle sof rhte robot to tocuht that x,y,z
+        # coordinate at the orientation defined by the euler angles derived form quaterniosn
+        requestList = self.IK.main(destination)
+        if requestList is not None and self.do_kinematics and None not in destination:
+            #requestList = self.pid_loop(requestList)
+            #ssend this request list of angle sfo rhte 6dof robot to the forward kinetmatic solver
+            self.FK.main(requestList) # this does the plotting and disly
+            return requestList
+
+    #forward kinematics
     def compute_fkLimbAngles(self):
 
         #Compute fk angle between given 3 points for all sets of 3 points given
@@ -367,29 +464,11 @@ class MimicController:
         thetaListFK = np.array([baseTheta, shoudler_elbow[0], shoudler_elbow[1], differTheta[0], differTheta[1]])
         if len(thetaListFK) ==6:
             self.SIX_DOF_MODE = True
+        thetaListFK = [ int(angle) for angle in thetaListFK]
+
 
         return np.array(thetaListFK)
     #returns the joint angles to each accturator to match user arm angles
-
-
-
-    def compute_ikHandControlLimbAngles(self):
-
-
-        #Compute the (x,y,z) coordinate of the finger end effector
-
-
-        #Compute the vector given from wrist to end effector tip
-
-        #Compute 3d quaternion orientation in space
-
-
-        #Compute inverse kinematics with infomration above, returns fk joint angles
-
-
-
-        return np.array([])
-    #returns the joint angles to each accturator to match (x,y,z) coordiante in space and quaternionic orientiation
 
     def compute_baseAngle(self):
 
@@ -422,7 +501,7 @@ class MimicController:
         baseTheta = np.rad2deg(np.arccos(arg))
 
         # compute z coordiante prozimation
-        dist = self.Depth_Sovler.generate_zCoords(self.body_coords)
+        dist = self.depthLocalizer.generate_zCoords(self.body_coords)
         # Add z coord offset to the predicted  coords
         #self.cz_list = [z + dist for z in self.cz_list]
 
@@ -434,7 +513,10 @@ class MimicController:
 
     def compute_diffAngles(self):
         return [0,0]
-
+    def update_coordinates(self, body_coords, hand_coords):
+        self.cx_list, self.cy_list, self.cz_list = body_coords
+        self.body_coords = body_coords
+        self.hand_coords = hand_coords
     def compute_cv_angle(self, jointIndexes):
         '''THIS FUNCTION COMPUTES THE ANGLE BETWEEN 3 POINTS P1, P2, AND P3
             WHICH ARE ENUMERATED ACCORDING TO LANDMARK IDs.
@@ -487,127 +569,32 @@ class MimicController:
     #takes join indexes and returns the angles between the joint indexes from image
 
 
-    def update_coordinates(self, body_coords, hand_coords):
-        self.cx_list, self.cy_list, self.cz_list = body_coords
-        self.body_coords = body_coords
-        self.hand_coords = hand_coords
 
 
-def plot_topView(coords, recent_coords, ax):
-    cx_list, cy_list, cz_list = coords
+def test1():
 
-    # Get hip coordinates of interest
-    xcoords = [cx_list[24], cx_list[23]]
-    zcoords = [cz_list[24], cz_list[23]]
-
-    # Append them to a most recent list
-    recent_coords = np.append(recent_coords, [xcoords, zcoords], axis=1)
-
-    if recent_coords.shape[1] >= 60:
-        # Remove the oldest appended coordinate
-        recent_coords = np.delete(recent_coords, 0, axis=1)
-        recent_coords = np.delete(recent_coords, 0, axis=1)
-
-
-    # Clear plot
-    ax.clear()
-
-    # Plot all coordinates in recent_coords
-    ax.scatter(recent_coords[0], recent_coords[1])
-    unit = .2
-    ax.set_ylim([-unit, 1.2])
-    ax.set_xlim([150, 700])
+    Pacheck = Person(True)
 
 
 
-    plt.pause(0.01)
+    while True:
 
-    return recent_coords
-
-
-
-
-#todo======
-# Make 3D computer vision system
-def main_threaded(count = 2000):
-    # init mimic controler
-    simon = MimicController()
-    simon.Vision.USE_MULTITHREADING = True
-
-    i = 0
-    start_time = time.time()
-    try:
-        while i < count or count is None:
-            # everything
-            img, fk, ik  = simon.top_main()
-
-            # ============= cv disp
-            # Show the image
-            cv2.imshow("This is the name of the image box", img)
-            # Interface timing such that it looks like a video
-            cv2.waitKey(1)
-            i = i + 1
-
-    finally:
-        end_time = time.time()
-        total_time = start_time - end_time
-        print("THREADED TIME", total_time)
-        return total_time
+        try:
+            Pacheck.compute_ikHandControlLimbAngles()
+            print(Pacheck.PathFusor.get_from_limits())
 
 
-def main_no_threads(count):
-    # init mimic controler
-    simon = MimicController()
-    simon.Vision.USE_MULTITHREADING = False
-    i=0
-    start_time = time.time()
-    try:
-        while i<count:
-
-            # everything
-            img, thetaListFK, thetaListIK = simon.top_main()
-
-            # ============= cv disp
-            # Show the image
-            cv2.imshow("This is the name of the image box", img)
-            # Interface timing such that it looks like a video
-            cv2.waitKey(1)
-            i = i + 1
-
-    finally:
-        end_time = time.time()
-        total_time = start_time - end_time
-        print("UNTHREADED TIME", total_time)
-        return total_time
+            if Pacheck.img is not None:
+                img = Pacheck.img
+                cv2.imshow("me", img)
+                cv2.waitKey(1)
+        #except TypeError as TE:
+            #print(f"SOMETHINGS MISSING: {TE}")
+            #pass
+        except IndexError as IE:
+            print("No hands", IE)
 
 
-
-#Funciton unpuckles the data put ther en urinf ghte rest and proeforms data anlytics on the data
-def analyzer_test():
-
-    # Open the file for binary reading
-    with open('data.pickle', 'rb') as f:
-        # Unpickle the data
-        bbox_area_list = pkl.load(f)
-
-    loggedbbox_area_list = [np.log(x)+3*np.sqrt(x) for x,i in enumerate(bbox_area_list)]
-
-    fig, ax = plt.subplots()
-    ax.plot(np.linspace(0, 4, len(loggedbbox_area_list)), loggedbbox_area_list)
-
-    plt.show()
-
-
-
-def thread_comparision_testbench():
-
-    count = 500000000000000
-    threaded_time = main_threaded(count)
-    standard_time = main_no_threads(count)
-
-    print(f"threaded average cycle: {threaded_time/count}"
-          f"standard average cycle: {standard_time/count} "
-          f"")
 
 if __name__ == "__main__":
-    main_threaded()
+    test1()
