@@ -1,5 +1,5 @@
 import InverseKinematicsModule as Kinematics_module
-import ComputerVisonModulev1 as Vision_module
+#import ComputerVisonModulev1 as Vision_module
 from OpenArmV1.OpenArmLibs.DynamicsSolvers import MultivariableCalculus as MultiVarCalc_module, StatsModule
 
 import queue

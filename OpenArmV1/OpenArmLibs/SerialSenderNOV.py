@@ -35,18 +35,19 @@ import time
 class Arduino:
 
 
-    def __init__(self, port, baud):
+    def __init__(self, port, baud,demo = True):
         self.verbose = False
 
 
         # Serial connection parameters
         self.baud = int(baud)
         self.port = str(port)
+        self.demo_mode = demo
         try:
             self.ser = Serial(self.port, self.baud, timeout=0.1)
         except serial.serialutil.SerialException as Permissions:
             print(Permissions, "Probrally Permissions Error, Arduino not connected")
-
+            self.demo_mode = True
 
 
         # init connection status
@@ -60,8 +61,9 @@ class Arduino:
         # The number of characters each substring will have
         self.zfill_num = 4
 
-        #attempt to connect unril connected
-        self.connect2Arudino()
+        if not self.demo_mode:
+            #attempt to connect unril connected
+            self.connect2Arudino()
 
 
     def send_data(self, data, reset):

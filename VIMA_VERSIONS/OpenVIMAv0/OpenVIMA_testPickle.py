@@ -173,9 +173,13 @@ class RobotControlGUI:
 
         # ========================================================= COMPUTER VISION
         self.cap = cv2.VideoCapture(0)
+        frame, _ = self.cap.read()
+
         self.camera_label = customtkinter.CTkLabel(self.master, width=640, height=480, corner_radius=8, text="")
-        self.camera_label.place(x=600, y=500)
+        self.camera_label.place(x=600, y=200)
+
         self.vision = myCV.ComputerVisionBody(False)  # Kalman filter bool as args**
+        #self.process_image(frame, self.camera_label, (640, 480))
 
         # ========================================================  SLIDERS for Forward Kinematics
 
@@ -205,9 +209,9 @@ class RobotControlGUI:
         #self.fig.set_figheight(4*2)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
         self.robot_plot = self.canvas.get_tk_widget()
-        self.robot_plot.configure(width=640*2.1, height=480*1.4, selectforeground='maroon')
+        self.robot_plot.configure(width=640, height=480, selectforeground='maroon')
         #self.canvas.get_renderer()
-        self.robot_plot.place(x=850, y=170)
+        self.robot_plot.place(x=650, y=170)
         # self.Fk.main(init_angles)
         self.animate(init_angles)
 
@@ -397,7 +401,7 @@ class RobotControlGUI:
 
 
             # Update image displayed
-            self.process_image(frame, self.camera_label, (640*.8 , 480*.7))
+            self.process_image(frame, self.camera_label, (640 , 480))
 
             # SHOULDER
             # cvThetaList ranges [13, 163] where 13 is arm all the way above the head, 163 is hand beside hip
@@ -478,7 +482,7 @@ class RobotControlGUI:
 
         # run whole loop
         self.master.after(1, self.main_loop)
-        #self.master.update()
+        self.master.update()
 
     '''=============================================   END MAIN LOOP FOR WHOLE SCRIPT'''
 
@@ -635,6 +639,8 @@ class RobotControlGUI:
         photo = customtkinter.CTkImage(image, size=size)
         label.configure(image=photo)
         label.image = photo
+        #self.master.after(10, self.process_image(frame, label, size))
+
 
 
     # Called in main_loop to update and maintain
